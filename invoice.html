@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.72/vfs_fonts.js"></script>
+  <script>
+    window.jsPDF = window.jspdf.jsPDF;
+
+function generateInvoice(clientName, clientAddress, itemsList, totalTax, totalDiscount, finalAmount, operationtype, clientEmail, clientPhone) {
+  // Create a new jsPDF instance
+  const doc = new jsPDF();
+
+  // Function to add a new page with the table header
+  function addNewPage() {
+    doc.addPage();
+
+    // Reset itemY for the new page
+    itemY = 20; // Set a new Y position for the items on the new page (adjust as needed)
+
+    // Repaint the table header background and text for new pages
+    doc.setFillColor(94, 55, 146);
+    doc.rect(10, itemY, 190, 10, 'F'); // Header row background
+    doc.setTextColor(255, 255, 255);
+    doc.text('Description', 12, itemY + 7);
+    doc.text('Price', 100, itemY + 7);
+    doc.text('Quantity', 140, itemY + 7);
+    doc.text('Amount', 190, itemY + 7, { align: 'right' });
+    doc.setTextColor(0, 0, 0); // Reset text color for items
+    itemY += 10; // Adjust the Y position after the header
+  }
+
+  // Set background color for the header section (20% area)
+  doc.setFillColor(94, 55, 146);
+  doc.rect(0, 0, 210, 47, 'F'); // Rectangle to fill top 20% of A4
+
+  // Add the invoice title
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.text('Invoice', 10, 25); // Title at the top-left
+
+  // Company details on the right side
+  const rightX = 200; // Set the rightmost x-coordinate for alignment
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16); // Increased font size for company name
+  doc.text('SNZ Trading Corporation', rightX, 15, { align: 'right' });
+
+  // Address details
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12); // Reset font size for address
+  doc.text('23 Lloyd Ct,', rightX, 22, { align: 'right' });
+  doc.text('Brooklyn NY11223', rightX, 29, { align: 'right' });
+  doc.text('Contact # 718-644-7560', rightX, 36, { align: 'right' });
+  doc.text('Email: snztradingcorporation@gmail.com', rightX, 43, { align: 'right' });
+
+  // Bill to section and generation date
+  doc.setFillColor(255, 255, 255);
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(14);
+  doc.text('Bill To:', 10, 60);
+  doc.setFontSize(12);
+  doc.text(clientName, 10, 68);
+
+  // Add client address if it exists
+  let billSectionY = 75; // Initialize Y position for additional content
+  if (clientAddress) {
+    const addressLines = doc.splitTextToSize(clientAddress, 75); // Wrap address to fit within 75 width
+    addressLines.forEach((line, index) => {
+      doc.text(line, 10, billSectionY + (index * 7)); // Each line 7 units apart
+    });
+    billSectionY += (addressLines.length - 1) * 7; // Update Y position for following content
+  }
+
+  // Add client email if not empty
+  if (clientEmail) {
+    doc.text(`Email: ${clientEmail}`, 10, billSectionY + 7); // Add email below address
+    billSectionY += 7; // Adjust position for the next field
+  }
+
+  // Add client phone if not empty
+  if (clientPhone) {
+    doc.text(`Phone: ${clientPhone}`, 10, billSectionY + 7); // Add phone number below email
+    billSectionY += 7; // Adjust position for next content
+  }
+
+  doc.text('Date of Generation:', rightX, 60, { align: 'right' });
+  doc.text(new Date().toLocaleDateString(), rightX, 68, { align: 'right' });
+
+  // Items table
+  const startY = billSectionY + 7; // Starting position for items table
+  doc.setFontSize(12);
+  doc.setTextColor(255, 255, 255);
+  doc.setFillColor(94, 55, 146);
+  doc.rect(10, startY, 190, 10, 'F'); // Header row background
+  doc.text('Description', 12, startY + 7);
+  doc.text('Price', 100, startY + 7);
+  doc.text('Quantity', 140, startY + 7);
+  doc.text('Amount', 190, startY + 7, { align: 'right' });
+
+  // Item rows
+  doc.setTextColor(0, 0, 0);
+  let itemY = startY + 10; // Adjusted starting position after the header
+  const items = itemsList; // Using itemsList parameter
+
+  items.forEach((item, index) => {
+    // Check if page break is needed
+    if (itemY + 10 > doc.internal.pageSize.height - 20) {
+      addNewPage(); // Create a new page and reset itemY for new page
+    }
+
+    // Alternate row colors
+    const isEvenRow = index % 2 === 0;
+    doc.setFillColor(isEvenRow ? 232 : 255, isEvenRow ? 239 : 255, isEvenRow ? 255 : 255); // Alternating colors
+
+    // Get description lines
+    const descriptionLines = doc.splitTextToSize(item.description, 85); // Width of the description column
+    const linesCount = descriptionLines.length;
+
+    // Calculate height of the row
+    const rowHeight = Math.max(10, linesCount * 5 + 5); // Minimum height is 10 for single-line items, added extra spacing
+
+    // Draw background for the row
+    doc.rect(10, itemY, 190, rowHeight, 'F');
+
+    // Print description and adjust Y position accordingly
+    for (let i = 0; i < linesCount; i++) {
+      doc.text(descriptionLines[i], 12, itemY + (i * 5) + 8); // Adjust for row height
+    }
+
+    // Center the Price, Quantity, and Amount within the row
+    const centerY = itemY + (rowHeight / 2); // Calculate the center of the row
+    doc.text(item.price, 100, centerY + 2, { align: 'left' }); // Align to center of the row
+    doc.text(item.quantity, 140, centerY + 2, { align: 'left' }); // Align to center of the row
+    doc.text(item.amount, 190, centerY + 2, { align: 'right' }); // Right align to bottom of the row with a little offset
+
+    // Update Y position for the next item
+    itemY += rowHeight; // Move to next row position
+  });
+
+  // Totals section
+  doc.setFontSize(14);
+  
+  itemY += 10;
+
+  if (totalTax > 0) {
+    doc.text(`Tax: $${totalTax.toFixed(2)}`, 190, itemY, { align: 'right' });
+    itemY += 7;
+  }
+  
+  if (totalDiscount > 0) {
+    doc.text(`Discount: $${totalDiscount.toFixed(2)}`, 190, itemY, { align: 'right' });
+    itemY += 7;
+  }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(`Total Amount: $${finalAmount.toFixed(2)}`, 190, itemY, { align: 'right' });
+
+  // Note section
+  itemY += 20;
+  doc.setFillColor(232, 239, 255); // Change background to white
+  doc.rect(10, itemY, 190, 20, 'F');
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0, 0, 0); // Change text color to black
+  doc.text('Note: Any additional modifications or changes may incur additional charges. Thank you.', 12, itemY + 10);
+  
+  if (operationtype == 'print') {
+    doc.autoPrint();
+
+    const hiddFrame = document.createElement('iframe');
+    hiddFrame.style.position = 'fixed';
+    hiddFrame.style.width = '1px';
+    hiddFrame.style.height = '1px';
+    hiddFrame.style.opacity = '0.01';
+    document.body.appendChild(hiddFrame);
+
+    hiddFrame.src = doc.output('bloburl');
+    hiddFrame.focus();
+    hiddFrame.contentWindow.print();
+  } else if (operationtype == 'download') {
+    doc.save(clientName + '_SNZ.pdf');
+  } else {
+    const blobUrl = doc.output('bloburl');
+    window.open(blobUrl, '_blank');
+  }
+}
+
+function createInvoicePDF(clientName, clientAddress, itemsList, totalTax, totalDiscount, finalAmount,operationtype,clientEmail,clientPhone) {
+  const customerInfo = [];
+
+  // Add client name if it exists
+  if (clientName) {
+    customerInfo.push({ text: clientName, margin: [0, 0, 0, 5] });
+  }
+
+  // Add client address if it exists
+  if (clientAddress) {
+    if (clientAddress.length > 40) {
+      // Split the address into two lines if it's too long
+      customerInfo.push(
+        { text: clientAddress.slice(0, 40), margin: [0, 0, 0, 5] },
+        { text: clientAddress.slice(40), margin: [0, 0, 0, 5] }
+      );
+    } else {
+      customerInfo.push({ text: clientAddress, margin: [0, 0, 0, 5] });
+    }
+  }
+  if(clientEmail)
+  {
+    customerInfo.push({ text: `Email: ${clientEmail}`, margin: [0, 0, 0, 5] });
+  }
+  if(clientPhone)
+  {
+    customerInfo.push({ text: `Phone: ${clientPhone}`, margin: [0, 0, 0, 5] });
+  }
+  const docDefinition = {
+    content: [
+      {
+        canvas: [
+          { type: 'rect', x: 0, y: 0, w: 595.28, h: 120, color: '#114863' }
+        ],
+        absolutePosition: { x: 0, y: 0 },
+        margin: [0, 0, 0, 10]
+      },
+      {
+        text: 'MS Micro Trading Inc',
+        fontSize: 28,
+        bold: true,
+        color: 'white',
+        alignment: 'center',
+        absolutePosition: { x: 0, y: 50 }
+      },
+      {
+        text: 'Invoice Date: ' + new Date().toLocaleDateString(),
+        alignment: 'center',
+        margin: [0, 30, 0, 20]
+      },
+      {
+        columns: [
+          {
+            text: 'Bill To:',
+            bold: true,
+            margin: [20, 0, 20, 5]
+          },
+          {
+            text: 'Company Details:',
+            bold: true,
+            alignment: 'right',
+            margin: [20, 0, 20, 5]
+          }
+        ]
+      },
+      {
+        columns: [
+          {
+            stack: customerInfo,
+            width: '*',
+            margin: [20, 0, 20, 20]
+          },
+          {
+            stack: [
+              { text: '1532 Ocean Ave Unit # 4K', margin: [0, 0, 0, 5] },
+              { text: 'Brooklyn NY 11230', margin: [0, 0, 0, 5] },
+              { text: 'Contact # 718-964-7568', margin: [0, 0, 0, 5] },
+              { text: 'Email: mstradingcorp45@gmail.com' }
+            ],
+            width: '*',
+            alignment: 'right',
+            margin: [20, 0, 20, 20]
+          }
+        ]
+      },
+      {
+        table: {
+          widths: ['*', 'auto', 'auto', 'auto'],
+          body: [
+            [
+              { text: 'Description', style: 'tableHeader', fillColor: '#114863', margin: [5, 5, 5, 5] },
+              { text: 'Quantity', style: 'tableHeader', fillColor: '#114863', margin: [5, 5, 5, 5] },
+              { text: 'Price', style: 'tableHeader', fillColor: '#114863', margin: [5, 5, 5, 5] },
+              { text: 'Amount', style: 'tableHeader', fillColor: '#114863', margin: [5, 5, 5, 5] }
+            ],
+            ...itemsList.map((item, index) => [
+              {
+                text: item.description,
+                fillColor: index % 2 === 0 ? 'white' : '#BEE6F6',
+                margin: [5, 5]
+              },
+              {
+                text: item.quantity,
+                fillColor: index % 2 === 0 ? 'white' : '#BEE6F6',
+                margin: [5, 5],
+                alignment: 'center'
+              },
+              {
+                text: `$${item.price}`,
+                fillColor: index % 2 === 0 ? 'white' : '#BEE6F6',
+                margin: [5, 5],
+                alignment: 'center'
+              },
+              {
+                text: `$${item.amount}`,
+                fillColor: index % 2 === 0 ? 'white' : '#BEE6F6',
+                margin: [5, 5],
+                alignment: 'right'
+              }
+            ])
+          ]
+        },
+        layout: 'noBorders',
+        margin: [20, 10, 20, 10]
+      },
+      {
+        columns: [
+          {
+            text: 'Note: \nAny additional modifications or changes may incur \n additional charges. Thank you.',
+            width: '*',
+            margin: [20, 20, 0, 0],
+            fillColor: '#E8EFFB'
+          },
+          {
+            width: 'auto',
+            alignment: 'right',
+            table: {
+              body: [
+                // Only add discount row if totalDiscount is not zero
+                ...(totalDiscount > 0 ? [[
+                  { text: 'Discount:', alignment: 'right', margin: [5, 0] },
+                  { text: `$${totalDiscount}`, alignment: 'right', margin: [5, 0] }
+                ]] : []),
+                // Only add tax row if totalTax is not zero
+                ...(totalTax > 0 ? [[
+                  { text: 'Tax:', alignment: 'right', margin: [5, 5] },
+                  { text: `$${totalTax}`, alignment: 'right', margin: [5, 5] }
+                ]] : []),
+                [
+                  {
+                    text: 'Total Amount:',
+                    bold: true,
+                    fillColor: '#114863',
+                    color: 'white',
+                    margin: [5, 5],
+                    alignment: 'right'
+                  },
+                  {
+                    text: `$${finalAmount}`,
+                    bold: true,
+                    fillColor: '#114863',
+                    color: 'white',
+                    margin: [5, 5],
+                    alignment: 'right'
+                  }
+                ]
+              ]
+            },
+            margin: [0, 20, 20, 0],
+            layout: 'noBorders'
+          }
+        ]
+      }
+    ],
+    styles: {
+      tableHeader: {
+        bold: true,
+        fontSize: 13,
+        color: 'white',
+        alignment: 'center'
+      }
+    },
+    defaultStyle: {
+      font: 'Roboto'
+    },
+    pageSize: 'A4',
+    pageMargins: [20, 120, 20, 40]
+  };
+
+  
+  if(operationtype=='print')
+  {
+    pdfMake.createPdf(docDefinition).print();
+  }
+  else if(operationtype=='download')
+  {// Save the PDF
+    pdfMake.createPdf(docDefinition).download(clientName+'_MS.pdf');
+  }
+  else
+  {
+    pdfMake.createPdf(docDefinition).open();
+  }
+}
+
+function generateNewInvoice(clientName, clientAddress, itemsList, totalTax, totalDiscount, finalAmount, operationtype, clientEmail, clientPhone) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'a4');
+    const pageHeight = doc.internal.pageSize.height; // Height of a single page
+    const pageWidth = doc.internal.pageSize.width; // Width of a single page
+    const margin = 40; // Common margin for content
+    let currentY = 0; // Current Y position for content
+
+    // Function to check if we need to add a new page
+    function checkPageSpace(neededSpace) {
+        if (currentY + neededSpace > pageHeight - margin) {
+            doc.addPage();
+            currentY = margin; // Reset Y position to the top for the new page
+        }
+    }
+
+    // Top Area (15% of the Page Height)
+    let topHeight = pageHeight * 0.15;
+
+    // Draw the top background
+    doc.setFillColor(68, 115, 169); // #4473A9
+    doc.rect(0, 0, pageWidth * 0.7, topHeight, 'F'); // 70%
+
+    doc.setFillColor(41, 52, 82); // #293452
+    doc.rect(pageWidth * 0.7, 0, pageWidth * 0.3, topHeight, 'F'); // 30%
+
+    // Company Name (Left Section, Large Font)
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(255, 255, 255); // White text color
+    doc.setFontSize(24);
+    doc.text("Mund Contracting Inc", 24, 70); // Shifted down
+
+    // Date (Centered in 30% Area, Smaller Font)
+    doc.setFontSize(12);
+    const dateText = "Date: " + new Date().toLocaleDateString();
+    const dateXPos = pageWidth * 0.85; // Center of 30% area horizontally
+    doc.text(dateText, dateXPos, 68, { align: 'center' }); // Horizontally centered with company name, smaller font
+
+    // Bill To and Company Details
+    doc.setTextColor(0, 0, 0); // Black text color
+    doc.setFontSize(12);
+
+    // Client Name (Always printed)
+    doc.setFont('Helvetica', 'bold');
+    doc.text("Bill To:", 40, topHeight + 30);
+    doc.setFont('Helvetica', 'normal');
+    doc.text(clientName, 40, topHeight + 50);
+
+    let clientDetailsY = topHeight + 70;
+    if (clientAddress) {
+        const addressLines = doc.splitTextToSize(clientAddress, 35 * 5);
+        doc.text(addressLines, 40, clientDetailsY); // Adjusted Y position for multi-line address
+        clientDetailsY += (addressLines.length * 12 + 5); // Adjust Y based on the address length
+    }
+
+    // Client Email (if provided)
+    if (clientEmail) {
+        doc.text("Email: " + clientEmail, 40, clientDetailsY);
+        clientDetailsY += 17; // Adjust Y position after email
+    }
+
+    // Client Phone (if provided)
+    if (clientPhone) {
+        doc.text("Phone: " + clientPhone, 40, clientDetailsY);
+        clientDetailsY += 17; // Adjust Y position after phone
+    }
+
+    // Company Details
+    doc.setFont('Helvetica', 'bold');
+    doc.text("Company Details:", pageWidth * 0.7, topHeight + 30); // Left align in right section
+    doc.setFont('Helvetica', 'normal');
+
+    const companyDetails = [
+        "2821 Kings Hwy Unit # 4J",
+        "Brooklyn NY 11229",
+        "Contact # 718-909-4875",
+        "mundcontractinginc@gmail.com"
+    ];
+
+    let companyDetailsY = topHeight + 50;
+    companyDetails.forEach((line) => {
+        doc.text(line, pageWidth * 0.7, companyDetailsY); // Print each line
+        companyDetailsY += 17; // Add space between each line
+    });
+
+    // Adjust topHeight based on client details section
+    topHeight = clientDetailsY;
+    if (clientDetailsY < 240) {
+        topHeight = 240;
+    }
+
+    // Horizontal Line
+    doc.setDrawColor(109, 116, 128); // Line color #6D7480
+    doc.line(40, topHeight, pageWidth - 40, topHeight);
+
+    // Table Header
+    const tableTop = topHeight + 10;
+    doc.setFontSize(12);
+    const headerHeight = 25;
+    const centerYHeader = tableTop + headerHeight / 2;
+
+    // Set header font to bold
+    doc.setFont('Helvetica', 'bold');
+    doc.text("Description", 40, centerYHeader);
+    doc.text("Quantity", pageWidth * 0.55, centerYHeader); // Reduced space for quantity
+    doc.text("Price", pageWidth - 180, centerYHeader); // More space for price
+    doc.text("Amount", pageWidth - 40, centerYHeader, { align: 'right' });
+
+    // Horizontal Line below header
+    doc.line(40, tableTop + headerHeight, pageWidth - 40, tableTop + headerHeight);
+
+    // Sample Data Rows with multiline Description
+    currentY = tableTop + headerHeight + 10;
+    itemsList.forEach((item) => {
+        const descriptionLines = doc.splitTextToSize(item.description, 200);
+
+        const rowHeight = Math.max(descriptionLines.length * 12 + 10, 25);
+        const centerY = currentY + rowHeight / 2;
+
+        // Check if adding this row will exceed the page height, if so add a new page
+        
+        doc.setFont('Helvetica', 'normal');
+        doc.text(descriptionLines, 40, currentY + 10);
+
+        doc.text(item.quantity, pageWidth * 0.55, centerY);
+        doc.text(item.price, pageWidth - 180, centerY);
+        doc.text(item.amount, pageWidth - 40, centerY, { align: 'right' });
+
+        const lineY = currentY + rowHeight;
+        doc.line(40, lineY, pageWidth - 40, lineY);
+
+        currentY += rowHeight + 5;
+        checkPageSpace(rowHeight);
+    });
+
+    // Discount, Tax, and Total Amount
+    doc.setFontSize(12);
+    let totalYPosition = currentY + 30;
+
+    if (totalDiscount > 0) {
+        checkPageSpace(30);
+        doc.text("Discount:", pageWidth - 180, totalYPosition);
+        doc.text(`$${totalDiscount.toFixed(2)}`, pageWidth - 40, totalYPosition, { align: 'right' });
+        totalYPosition += 15;
+    }
+
+    if (totalTax > 0) {
+        checkPageSpace(30);
+        doc.text("Tax:", pageWidth - 155, totalYPosition);
+        doc.text(`$${totalTax.toFixed(2)}`, pageWidth - 40, totalYPosition, { align: 'right' });
+        totalYPosition += 15;
+    }
+
+    // Total Amount
+    checkPageSpace(40);
+    doc.setFontSize(14);
+    const totalAmountY = totalYPosition + 20;
+    doc.setFont('Helvetica', 'bold');
+    doc.text("Total Amount:", pageWidth - 220, totalAmountY);
+    doc.text(`$${finalAmount.toFixed(2)}`, pageWidth - 40, totalAmountY, { align: 'right' });
+
+    currentY = totalAmountY + 40;
+
+    // Notes Section
+    checkPageSpace(60);
+    doc.setFont('Helvetica', 'bold');
+    doc.text("Note", 40, currentY);
+    doc.line(40, currentY + 5, pageWidth - 40, currentY + 5);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(109, 116, 128);
+    doc.text("Any additional modifications or changes may incur additional charges. Thank you.", 40, currentY + 20);
+
+    currentY += 40;
+
+    // Handle Print, Download, and View operations
+    if (operationtype === 'print') {
+        doc.autoPrint();
+        const hiddenFrame = document.createElement('iframe');
+        hiddenFrame.style.width = '1px';
+        hiddenFrame.style.height = '1px';
+        hiddenFrame.style.opacity = '0.01';
+        hiddenFrame.src = doc.output('bloburl');
+        document.body.appendChild(hiddenFrame);
+        hiddenFrame.focus();
+        hiddenFrame.contentWindow.print();
+    } else if (operationtype === 'download') {
+        doc.save(`${clientName}_Mund.pdf`);
+    } else {
+        window.open(doc.output('bloburl'), '_blank');
+    }
+}
+
+
+
+
+
+  </script>
+  <style>
+    .clear-class{
+      margin:0 auto;
+    display:block;
+    }
+    .price-column {
+      min-width: 100px;
+    }
+    .btn-custom {
+      width: 100%;
+      margin-bottom: 10px; /* Space between buttons */
+      border: none; /* Remove border */
+      border-radius: 0; /* Remove border radius */
+    }
+    .form-control {
+      min-height: 40px; /* Increase height for textboxes */
+    }
+    .tax-discount-row {
+      display: flex;
+      flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+      gap: 10px; /* Space between textboxes */
+    }
+    .tax-discount-column {
+      flex: 1 1 calc(25% - 10px); /* Ensure equal width with gap consideration */
+      min-width: 150px; /* Prevent textboxes from being too small */
+    }
+    @media (max-width: 576px) {
+      .tax-discount-column {
+        flex: 1 1 calc(100% - 10px); /* Stack columns on small screens with gap consideration */
+
+      }
+      .btn-container {
+        display: flex;
+        flex-direction: column; /* Stack buttons vertically */
+        align-items: center; /* Center align buttons */
+      }
+    }
+    @media (min-width: 576px) and (max-width: 991px)
+    {
+      .taxlbl
+      {
+        padding-bottom: 24px;
+      }
+    }
+    @media (min-width: 576px) and (max-width: 767px)
+    {
+      #discountPercentage
+      {
+        width: 149.33px !important;
+      }
+    }
+    .center-screen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    /* Custom radio button styling */
+    .form-check-input {
+      appearance: none; /* Hide default radio button */
+      width: 20px;
+      height: 20px;
+      border: 2px solid #000; /* Bold black border */
+      border-radius: 50%;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+    }
+
+    /* Style for selected radio button */
+    .form-check-input:checked {
+      background-color: black; /* Fill the selected radio button */
+    }
+
+    /* Make the inside circle blue when checked */
+    .form-check-input:checked::before {
+      content: '';
+      display: block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: blue; /* Blue color for the inner circle */
+      position: absolute;
+      top: 2px;
+      left: 2px;
+    }
+    h2 {
+   width: 100%; 
+   text-align: center; 
+   border-bottom: 1px solid #000; 
+   line-height: 0.1em;
+   margin: 10px 0 20px; 
+} 
+
+h2 span { 
+    background:#fff; 
+    padding:0 10px; 
+}
+  </style>
+  <title>Invoice</title>
+</head>
+<body>
+  <div class="container mt-5">
+    <h1 class="text-center">Invoice Generator</h1>
+    <h5 class="text-center">Select an Action for the PDF</h5>
+    <div class="container center-screen">
+    <div class="form-check form-check-inline">
+      <input class="form-check-input" type="radio" name="pdfOption" id="printOption" value="print">
+      <label class="form-check-label" for="printOption">
+        Print
+      </label>
+    </div>
+    <div class="form-check form-check-inline">
+      <input class="form-check-input" type="radio" name="pdfOption" id="downloadOption" value="download" checked>
+      <label class="form-check-label" for="downloadOption">
+        Download
+      </label>
+    </div>
+    <div class="form-check form-check-inline">
+      <input class="form-check-input" type="radio" name="pdfOption" id="showOption" value="show">
+      <label class="form-check-label" for="showOption">
+        Show
+      </label>
+    </div>
+  </div>
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <label for="clientName" class="form-label">Client Name</label>
+        <input type="text" class="form-control" id="clientName" placeholder="Enter client name">
+      </div>
+      <div class="col-md-6">
+        <label for="clientAddress" class="form-label">Client Address</label>
+        <input type="text" class="form-control" id="clientAddress" placeholder="Enter client address">
+      </div>
+    </div>
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <label for="clientEmail" class="form-label">Client Email</label>
+        <input type="text" class="form-control" id="clientEmail" placeholder="Enter client Email">
+      </div>
+      <div class="col-md-6">
+        <label for="clientPhone" class="form-label">Client Phone</label>
+        <input type="tel" class="form-control" id="clientPhone" placeholder="Enter client Phone">
+      </div>
+    </div>
+    <hr>
+    <h2><span>End Personal Area</span></h2>
+    <hr>
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <label for="itemDescription" class="form-label">Description</label>
+        <input type="text" class="form-control" id="itemDescription" placeholder="Item description">
+      </div>
+      <div class="col-md-2">
+        <label for="itemQuantity" class="form-label">Quantity</label>
+        <input type="number" class="form-control" id="itemQuantity" placeholder="Quantity">
+      </div>
+      <div class="col-md-2">
+        <label for="itemPrice" class="form-label">Price</label>
+        <input type="number" class="form-control" id="itemPrice" placeholder="Price">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary" id="addItemBtn">Add Item</button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered" id="itemsTable">
+        <thead class="table-light">
+          <tr>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th class="price-column">Price</th>
+            <th>Amount</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="itemsList"></tbody>
+      </table>
+    </div>
+
+    <div class="row mt-4 tax-discount-row">
+      <div class="tax-discount-column">
+        <label for="taxAmount" class="form-label taxlbl" >Tax by Number ($)</label>
+        <input type="number" class="form-control" id="taxAmount">
+      </div>
+      <div class="tax-discount-column">
+        <label for="taxPercentage" class="form-label">Tax by Percentage (%)</label>
+        <input type="number" class="form-control" id="taxPercentage">
+      </div>
+      <div class="tax-discount-column">
+        <label for="discountAmount" class="form-label">Discount by Number ($)</label>
+        <input type="number" class="form-control" id="discountAmount">
+      </div>
+      <div class="tax-discount-column">
+        <label for="discountPercentage" class="form-label">Discount by Percentage (%)</label>
+        <input type="number" class="form-control" id="discountPercentage">
+      </div>
+    </div>
+
+    <div class="row mt-4 btn-container">
+      <div class="col-md-4">
+        <button class="btn btn-success btn-custom" id="generateInvoiceBtn" style="background-color: rgb(94, 55, 146); color: white;">Generate Invoice SNZ</button>
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-success btn-custom" id="generateInvoiceBtn1" style="background-color: #114863; color: white;">Generate Invoice MS</button>
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-success btn-custom" id="generateInvoiceBtn2" style="background-color: #4473A9; color: white;">Generate Invoice Mund</button>
+      </div>
+    </div>
+    <div class="row mt-4">
+    <div class="col">
+        <button class="btn btn-danger clear-class" id="clearFormBtn">Clear</button>
+    </div>
+</div>
+    <div class="row mt-4">
+      <div class="col">
+        <h4>Total Amount: $<span id="totalAmount">0.00</span></h4>
+      </div>
+    </div>
+  </div>
+  <script>
+        const itemsList = [];
+        let totalAmount = 0;
+
+        document.getElementById('addItemBtn').addEventListener('click', () => {
+            const description = document.getElementById('itemDescription').value.trim();
+            let quantity = document.getElementById('itemQuantity').value;
+            const price = parseFloat(document.getElementById('itemPrice').value);
+
+            if (!description || isNaN(price) || price <= 0) {
+                alert('Please enter a valid description and price.');
+                return;
+            }
+
+            if (!quantity || quantity <= 0) {
+                quantity = 1;
+            } else {
+                quantity = parseFloat(quantity);
+            }
+            const itemExists = itemsList.some(item => item.description.toLowerCase() === description.toLowerCase());
+
+          if (itemExists) {
+            // Show a message box if the item already exists
+            alert('Item is already in the list. Please edit it in the list.');
+            return;
+          }
+            const amount = quantity * price;
+            const item = { description, price: price.toFixed(2), quantity: quantity.toString(), amount: amount.toFixed(2) };
+            itemsList.push(item);
+
+            updateItemsTable();
+            updateTotalAmount();
+            // Clear the description, quantity, and price textboxes
+        document.getElementById('itemDescription').value = '';
+        document.getElementById('itemQuantity').value = '';
+        document.getElementById('itemPrice').value = '';
+
+        // Optionally, you can reset focus to the description textbox
+        document.getElementById('itemDescription').focus();
+        });
+
+        function updateItemsTable() {
+            const itemsTable = document.getElementById('itemsList');
+            itemsTable.innerHTML = '';
+
+            itemsList.forEach((item, index) => {
+                const row = document.createElement('tr');
+
+                const descriptionCell = document.createElement('td');
+                const quantityCell = document.createElement('td');
+                const priceCell = document.createElement('td');
+                const amountCell = document.createElement('td');
+                const actionsCell = document.createElement('td');
+
+                descriptionCell.innerHTML = `<input type="text" value="${item.description}" class="form-control" onchange="updateItem(${index}, 'description', this.value)">`;
+                quantityCell.innerHTML = `<input type="number" value="${item.quantity}" class="form-control" onchange="updateItem(${index}, 'quantity', this.value)">`;
+                priceCell.innerHTML = `<input type="number" value="${item.price}" class="form-control price-column" onchange="updateItem(${index}, 'price', this.value)">`;
+                amountCell.textContent = item.amount;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-danger';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => {
+                    itemsList.splice(index, 1);
+                    updateItemsTable();
+                    updateTotalAmount();
+                });
+
+                actionsCell.appendChild(deleteBtn);
+                row.appendChild(descriptionCell);
+                row.appendChild(quantityCell);
+                row.appendChild(priceCell);
+                row.appendChild(amountCell);
+                row.appendChild(actionsCell);
+                itemsTable.appendChild(row);
+            });
+        }
+
+        function updateItem(index, key, value) {
+            if (key === 'quantity' || key === 'price') {
+                itemsList[index][key] = (value);
+            } else {
+                itemsList[index][key] = value;
+            }
+
+            itemsList[index].amount = (itemsList[index].quantity * itemsList[index].price).toFixed(2);
+            updateItemsTable();
+            updateTotalAmount();
+        }
+
+        function updateTotalAmount() {
+            totalAmount = itemsList.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+
+            const taxAmount = parseFloat(document.getElementById('taxAmount').value) || 0;
+            const taxPercentage = parseFloat(document.getElementById('taxPercentage').value) || 0;
+            const discountAmount = parseFloat(document.getElementById('discountAmount').value) || 0;
+            const discountPercentage = parseFloat(document.getElementById('discountPercentage').value) || 0;
+
+            let totalTax = 0;
+            if (taxAmount > 0) {
+                totalTax = taxAmount;
+            } else if (taxPercentage > 0) {
+                totalTax = (taxPercentage / 100) * totalAmount;
+            }
+
+            let totalDiscount = 0;
+            if (discountAmount > 0) {
+                totalDiscount = discountAmount;
+            } else if (discountPercentage > 0) {
+                totalDiscount = (discountPercentage / 100) * totalAmount;
+            }
+
+            const finalAmount = totalAmount + totalTax - totalDiscount;
+
+            document.getElementById('totalAmount').textContent = finalAmount.toFixed(2);
+        }
+
+        document.getElementById('taxAmount').addEventListener('input', updateTotalAmount);
+        document.getElementById('taxPercentage').addEventListener('input', updateTotalAmount);
+        document.getElementById('discountAmount').addEventListener('input', updateTotalAmount);
+        document.getElementById('discountPercentage').addEventListener('input', updateTotalAmount);
+
+        document.getElementById('generateInvoiceBtn').addEventListener('click', () => {
+            const clientName = document.getElementById('clientName').value.trim();
+            const clientAddress = document.getElementById('clientAddress').value.trim();
+            const clientEmail = document.getElementById('clientEmail').value.trim();
+            const clientPhone = document.getElementById('clientPhone').value.trim();
+
+            if (!clientName) {
+                alert('Please enter a valid client name.');
+                return;
+            }
+
+            if (itemsList.length === 0) {
+                alert('Please add at least one item to generate an invoice.');
+                return;
+            }
+
+            let totalTax = 0;
+            const taxAmount = parseFloat(document.getElementById('taxAmount').value) || 0;
+            const taxPercentage = parseFloat(document.getElementById('taxPercentage').value) || 0;
+
+            if (taxAmount > 0) {
+                totalTax = taxAmount;
+            } else if (taxPercentage > 0) {
+                totalTax = (taxPercentage / 100) * totalAmount;
+            }
+
+            let totalDiscount = 0;
+            const discountAmount = parseFloat(document.getElementById('discountAmount').value) || 0;
+            const discountPercentage = parseFloat(document.getElementById('discountPercentage').value) || 0;
+
+            if (discountAmount > 0) {
+                totalDiscount = discountAmount;
+            } else if (discountPercentage > 0) {
+                totalDiscount = (discountPercentage / 100) * totalAmount;
+            }
+
+            const finalAmount = totalAmount + totalTax - totalDiscount;
+
+            generateInvoice(clientName, clientAddress, itemsList, totalTax, totalDiscount, finalAmount,document.querySelector('input[name="pdfOption"]:checked').value,clientEmail,clientPhone);
+        });
+        document.getElementById('generateInvoiceBtn1').addEventListener('click', () => {
+            const clientName = document.getElementById('clientName').value.trim();
+            const clientAddress = document.getElementById('clientAddress').value.trim();
+            const clientEmail = document.getElementById('clientEmail').value.trim();
+            const clientPhone = document.getElementById('clientPhone').value.trim();
+
+            if (!clientName) {
+                alert('Please enter a valid client name.');
+                return;
+            }
+
+            if (itemsList.length === 0) {
+                alert('Please add at least one item to generate an invoice.');
+                return;
+            }
+
+            let totalTax = 0;
+            const taxAmount = parseFloat(document.getElementById('taxAmount').value) || 0;
+            const taxPercentage = parseFloat(document.getElementById('taxPercentage').value) || 0;
+
+            if (taxAmount > 0) {
+                totalTax = taxAmount;
+            } else if (taxPercentage > 0) {
+                totalTax = (taxPercentage / 100) * totalAmount;
+            }
+
+            let totalDiscount = 0;
+            const discountAmount = parseFloat(document.getElementById('discountAmount').value) || 0;
+            const discountPercentage = parseFloat(document.getElementById('discountPercentage').value) || 0;
+
+            if (discountAmount > 0) {
+                totalDiscount = discountAmount;
+            } else if (discountPercentage > 0) {
+                totalDiscount = (discountPercentage / 100) * totalAmount;
+            }
+
+            const finalAmount = totalAmount + totalTax - totalDiscount;
+
+            createInvoicePDF(clientName, clientAddress, itemsList, totalTax, totalDiscount, finalAmount,document.querySelector('input[name="pdfOption"]:checked').value,clientEmail,clientPhone);
+        });
+        document.getElementById('generateInvoiceBtn2').addEventListener('click', () => {
+            const clientName = document.getElementById('clientName').value.trim();
+            const clientAddress = document.getElementById('clientAddress').value.trim();
+            const clientEmail = document.getElementById('clientEmail').value.trim();
+            const clientPhone = document.getElementById('clientPhone').value.trim();
+
+            if (!clientName) {
+                alert('Please enter a valid client name.');
+                return;
+            }
+
+            if (itemsList.length === 0) {
+                alert('Please add at least one item to generate an invoice.');
+                return;
+            }
+
+            let totalTax = 0;
+            const taxAmount = parseFloat(document.getElementById('taxAmount').value) || 0;
+            const taxPercentage = parseFloat(document.getElementById('taxPercentage').value) || 0;
+
+            if (taxAmount > 0) {
+                totalTax = taxAmount;
+            } else if (taxPercentage > 0) {
+                totalTax = (taxPercentage / 100) * totalAmount;
+            }
+
+            let totalDiscount = 0;
+            const discountAmount = parseFloat(document.getElementById('discountAmount').value) || 0;
+            const discountPercentage = parseFloat(document.getElementById('discountPercentage').value) || 0;
+
+            if (discountAmount > 0) {
+                totalDiscount = discountAmount;
+            } else if (discountPercentage > 0) {
+                totalDiscount = (discountPercentage / 100) * totalAmount;
+            }
+
+            const finalAmount = totalAmount + totalTax - totalDiscount;
+
+            generateNewInvoice(clientName, clientAddress, itemsList, totalTax, totalDiscount, finalAmount,document.querySelector('input[name="pdfOption"]:checked').value,clientEmail,clientPhone);
+        });
+        // Add this at the end of your existing script
+document.getElementById('clearFormBtn').addEventListener('click', () => {
+    // Clear input fields
+    document.getElementById('clientName').value = '';
+    document.getElementById('clientAddress').value = '';
+    document.getElementById('clientEmail').value = '';
+    document.getElementById('clientPhone').value = '';
+    document.getElementById('itemDescription').value = '';
+    document.getElementById('itemQuantity').value = '';
+    document.getElementById('itemPrice').value = '';
+    document.getElementById('taxAmount').value = '';
+    document.getElementById('taxPercentage').value = '';
+    document.getElementById('discountAmount').value = '';
+    document.getElementById('discountPercentage').value = '';
+
+    // Clear items list and total amount
+    itemsList.length = 0; // Clear the array
+    updateItemsTable(); // Update the table
+    totalAmount = 0; // Reset total amount
+    document.getElementById('totalAmount').textContent = '0.00'; // Reset total amount display
+});
+
+    </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
